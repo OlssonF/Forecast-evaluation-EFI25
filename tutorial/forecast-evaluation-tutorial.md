@@ -17,6 +17,7 @@
         -   [4.2.2 Comparing forecasts from different
             models](#comparing-forecasts-from-different-models)
         -   [4.2.3 Skill scores](#skill-scores)
+        -   [4.2.4 Synthesis considerations](#synthesis-considerations)
 
 # 1 Background on forecast evaluation
 
@@ -552,4 +553,20 @@ aquatic_forecasts |>
 
 We see that at the shortest horizons, our model (`flareGLM`) does better
 than the null but beyond a couple of weeks lead time the null
-climatology model does better
+climatology model does better.
+
+### 4.2.4 Synthesis considerations
+
+-   are we making equal comparisons?
+
+For the aquatics example we are comparing 1028 climatology forecasts to
+`nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` -
+is this okay? What about if our phenology model only forecasted
+greenness during the winter (easy) and not in spring (harder)?
+
+-   who generated the model? (authorship, contributions)
+
+-   what sources of uncertainty are represented in the forecast? to
+    answer some questions about predictability it would be good to know
+    more about the model being used and how the forecasts and
+    uncertainty are generated.
