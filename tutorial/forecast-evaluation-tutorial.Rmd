@@ -1,0 +1,413 @@
+---
+title: "Forecast Evaluation"
+author: "Freya Olsson"
+output:
+  md_document: 
+    variant: markdown_github
+    number_sections: true
+    toc: true
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background on forecast evaluation
+
+**So, you made a forecast of future ecological conditions - now what?**
+
+Forecast evaluation is a crucial step in the iterative ecological forecasting cycle, helping to understand the strengths and weaknesses in our forecasting approaches. Comparison of model predictions and forecasts with observations can inform future model states through data assimilation, modify model configurations through model structure changes, and synthesise our understanding of predictability at different spatial, temporal, and ecological scales.
+
+These workshop materials will take you through some simple forecast evaluation exercises, using the NEON Forecast Challenge catalog of scores (forecast evaluation metrics). The exercises are based on experiences and methods employed by the original workshop leads and additional resources on forecast evaluation is included throughout for further reading.
+
+------------------------------------------------------------------------
+
+# This tutorial
+
+```{r required-packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(arrow)
+
+# if you need to download either of these packages uncomment this line!
+# install.packages(c('tidyverse','arrow'))
+```
+
+------------------------------------------------------------------------
+
+# Accessing NEON catalog
+
+Here, we provide a quick introduction to the EFI-NEON Forecast Challenge catalog, which will be used to demonstrate forecast evaluation methods and approaches. A more in-depth look at the NEON forecasts from the Challenge can be found in the [Get_scores_tutorial](https://github.com/eco4cast/NEON-forecast-challenge-workshop/tree/main/Analyse_scores) as part of the [NEON Forecast Challenge Workshop](https://github.com/eco4cast/NEON-forecast-challenge-workshop/).
+
+> The EFI-NEON Forecast Challenge is an open-source platform for teams and indivuduals to generate real-time ecological forecasts of a range of ecological variables (communties, populations, phenology, fluxes, and states) in both terrestrial and aquatic systems. More information on the Challenge can be found on the [Challenge website](https://projects.ecoforecast.org/neon4cast-ci/).
+>
+> The Challenge has been operating since 2021 and submissions are on-going across all five themes (beetles, ticks, phenology, terrestrial fluxes, aquatic water quality), contributing to a number of forecast synthesis projects and educational materials. See references and resources.
+
+We will use the catalog of forecasts and scores from the NEON Challenge. The full catalog can be found on a [STAC catalog](https://radiantearth.github.io/stac-browser/#/external/raw.githubusercontent.com/eco4cast/neon4cast-ci/main/catalog/catalog.json) developed by Challenge organizers. In here you can navigate to one of the sections (e.g. Scores/Forecasts/...) and access the catalog. Using Assets \> Database acces \> Copy URL for S3 you can then download forecast information into R.
+
+Below, we use the `URL for S3` for the scores and then using functions from the `arrow` package to connect to the location of the scores on an AWS bucket, subsetting, and then bringing the data locally in R.
+
+For this first set of examples we will use forecasts and scores from the phenology theme of the Challenge on the green up of foliage in a range of terrestrial habitats. These forecasts are for the greenness of plants as estimated using PhenoCam images from NEON sites. More information on the data used in this theme can be found in [Challenge documentation](https://projects.ecoforecast.org/neon4cast-docs/Phenology.html). You would access the phenology scores as follows
+
+```{r accessing-catalog1, eval=FALSE}
+
+phenology_scores_s3 <- "s3://anonymous@bio230014-bucket01/challenges/scores/bundled-parquet/project_id=neon4cast/duration=P1D/variable=gcc_90?endpoint_override=sdsc.osn.xsede.org"
+
+phenologu_scores <- arrow::open_dataset(phenology_scores_s3) |> 
+  collect()
+```
+
+This can be time consuming so we won't run it for now. We can use different dplyr verbs from tidyverse to query the dataset that we've opened before using the `collect()` function to collect that data into our local environment. For example, if you wanted to know what all the sites were in this forecast you could use `disinct()` before the collect.
+
+> Note: We are using the "scores" rather than "forecasts" for this because it contains the observations as well as the forecasts distributions. Changing scores to forecasts in the above s3 URL would get you the raw forecast submission.
+
+------------------------------------------------------------------------
+
+# Calculating and plotting evaluation metrics
+
+## Evaluating a single forecast
+
+We will start by looking at a single 35-day ahead forecast from a single model and a single site.
+
+```{r access-catalog2}
+phenology_scores_s3 <- "s3://anonymous@bio230014-bucket01/challenges/scores/bundled-parquet/project_id=neon4cast/duration=P1D/variable=gcc_90?endpoint_override=sdsc.osn.xsede.org"
+
+model_id_subset <- 'UCSC_P_EDM'
+site_id_subset <- 'HARV'
+reference_date_subset <- as_datetime('2021-05-01 00:00:00')
+
+single_forecast <- arrow::open_dataset(phenology_scores_s3) |> 
+  dplyr::filter(model_id == model_id_subset,
+                site_id == site_id_subset,
+                reference_datetime == reference_date_subset) |> 
+  collect() |> 
+  distinct()
+
+```
+
+We can plot the mean prediction compared to the observations as a visual starting point for evaluating that forecast.
+
+```{r single-forecast-plot}
+ggplot(single_forecast, aes(x=datetime)) +
+  geom_line(aes(y = mean)) +
+  geom_point(aes(y = observation))
+```
+
+We see that initially the forecast mean is close to the observations but as we get further into the future the forecast is less good. But how "less good" is it?
+
+### Point forecast evaluation
+
+#### Bias
+
+The first way we could evaluate the forecast is by looking at the difference between the mean prediction and the observed greenness - the forecast error or bias.
+
+```{r error-eval}
+single_forecast |> 
+  mutate(.by = c(datetime, reference_datetime, model_id, site_id),
+         error = mean - observation,
+         abs_error = abs(mean - observation),
+         sq_error = (mean - observation)^2) |> 
+  select(datetime, reference_datetime, model_id, site_id, error, abs_error, sq_error) |> 
+  pivot_longer(cols = error:sq_error, names_to = 'eval_metric', values_to = 'value') |> 
+  ggplot(aes(x=datetime, y=value)) +
+  geom_line() +
+  facet_wrap(~eval_metric)
+```
+
+```{r rmse-eval}
+single_forecast |> 
+  mutate(.by = c(datetime, reference_datetime, model_id, site_id),
+         error = mean - observation,
+         abs_error = abs(mean - observation),
+         sq_error = (mean - observation)^2) |> 
+  select(datetime, reference_datetime, model_id, site_id, error, abs_error, sq_error) |> 
+  reframe(.by = c(reference_datetime, model_id, site_id),
+          rmse = sqrt(mean(sq_error)),
+          mae = mean(abs_error))
+```
+
+### Probabilistic forecast evaluation
+
+But, remember these forecasts are probabilistic. They also include an estimation of uncertainty. For this normal distribution forecast this is represented by a standard deviation. The scores also include the predictive intervals based on the distribution specified in the forecast.
+
+#### Forecast spread
+
+```{r}
+single_forecast |> 
+  ggplot(aes(x = datetime)) +
+  geom_line(aes(y = sd))
+```
+
+```{r}
+single_forecast |> 
+  ggplot(aes(x=datetime)) +
+  geom_ribbon(aes(ymax = quantile97.5, ymin = quantile02.5), alpha = 0.3) +
+  geom_line(aes(y = mean)) +
+  geom_point(aes(y = observation))
+```
+
+#### CRPS
+
+```{r calculating-crps}
+
+```
+
+```{r plotting-crps}
+single_forecast |> 
+  ggplot(aes(x = datetime, y = crps)) +
+  geom_line()
+```
+
+#### Prediction interval reliability
+
+```{r reliability}
+single_forecast |> 
+  mutate(within_PI = between(observation, quantile02.5, quantile97.5)) |> 
+  select(model_id, site_id, datetime, observation, quantile10, quantile90, within_PI) |> 
+  reframe(.by = c(model_id, site_id, within_PI),
+          n = n()) |> 
+  pivot_wider(names_from = within_PI, names_prefix = 'within_', values_from = n, values_fill = 0) |> 
+  mutate(obs_relative = within_TRUE/(within_FALSE + within_TRUE)*100) 
+```
+
+## Evaluating multiple forecasts
+
+This is a useful starting point for thinking about evaluation metrics. However, we can begin to learn more by evaluating more forecasts and beginning to gain understanding on the *general patterns* or to make *comparisons* among models.
+
+1.  Comparing more forecasts from the same model - do the patterns we have observed in the single forecast evaluation hold for more forecasts. We can start to ask questions about the overall *predictability* of the variable using this model. Maybe this performance we observed was just a one off or maybe it is part of a pattern. We can only start to answer these questions by evaluating more forecasts.
+
+2.  Comparing forecasts from different models - how does our model compare to other model forecasts? These comparisons could be done with models with different configurations or parameters in a model selection framework or as a way to learn about predictability among models. One useful comparison is to compare forecast scores with those produces by a null or baseline model, calculating a relative *skill*.
+
+### Finding patterns in model evaluation
+
+We can't draw many conclusions from one forecast (n = 1) but perhaps by looking at more forecasts we can start identify patterns of predictability. We will omit the `reference_date_subset` step and instead get all the forecasts generated at `HARV` by `UCSC_P_EDM`.
+
+```{r accessing-catalog3}
+
+model_id_subset <- 'UCSC_P_EDM'
+site_id_subset <- 'HARV'
+
+multiple_forecasts <- arrow::open_dataset(phenology_scores_s3) |> 
+  dplyr::filter(model_id == model_id_subset,
+                site_id == site_id_subset) |> 
+  collect() |> 
+  distinct()
+
+```
+
+For this example, we have `r length(unique(multiple_forecasts$reference_datetime))` forecasts in the sample, from which we might be able to draw more conclusions about the general patterns of predictability. We can generate the same plots as above for bias and crps but now we can summarise the performance metrics.
+
+Firstly, we can look at how the performance varies by lead time (or horizon). To do this we need to first calculate the horizon for each date, which will vary by when the forecast was generated. For example a forecast for January 30th has a lead time or horizon of 1 day for a forecast with a reference_datetime of January 29th and a horizon of 10 days when the forecast was generated on January 20th. Therefore we can calculate the horizon as the difference between the reference_datetime and the datetime.
+
+```{r calc-horizon}
+multiple_forecasts <- multiple_forecasts |> 
+  mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |> 
+  filter(between(horizon, 1,30)) 
+```
+
+We can then summarise some of our metrics across horizon, to see how generally the model performs at different times into the future. Below we calculate the bias, rmse, sd, and crps (from the pre-scored column in the scores).
+
+```{r scores-by-horizon}
+
+multiple_forecasts |> 
+  mutate(abs_error = abs(mean - observation), 
+         sq_error = (mean - observation)^2) |> 
+  select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
+  reframe(.by = c(horizon, model_id, site_id),
+          rmse = sqrt(mean(sq_error, na.rm = T)),
+          mae = mean(abs_error, na.rm = T),
+          crps = mean(crps, na.rm = T)) |> 
+  pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
+  
+  ggplot(aes(x = horizon, y = value)) +
+  geom_line() +
+  facet_wrap(~eval_metric)
+
+```
+
+We see that each of the performance metrics increases (forecast performance reduces) at longer horizons. We could also see if we observed the same patterns at another site. `HARV` is a deciduous forecast, but do we see the same at `CLBJ`.
+
+```{r access-catalog4}
+model_id_subset <- 'PEG'
+site_id_subset <- c('HARV', 'CLBJ')
+
+multi_site_forecasts <- arrow::open_dataset(phenology_scores_s3) |> 
+  dplyr::filter(model_id == model_id_subset,
+                site_id %in% site_id_subset) |> 
+  collect() |> 
+  distinct() 
+
+multi_site_forecasts |> 
+  mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |> 
+  filter(between(horizon, 1,30))  |> 
+  mutate(abs_error = abs(mean - observation), 
+         sq_error = (mean - observation)^2) |> 
+  select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
+  reframe(.by = c(horizon, model_id, site_id),
+          rmse = sqrt(mean(sq_error, na.rm = T)),
+          mae = mean(abs_error, na.rm = T),
+          crps = mean(crps, na.rm = T)) |> 
+  pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
+  
+  ggplot(aes(x = horizon, y = value, colour = site_id)) +
+  geom_line() +
+  facet_wrap(~eval_metric)
+
+```
+
+We see that the performance at CLBJ (Lyndon B. Johnson National Grassland, in Texas) is higher than at HARV (Harvard Forest, Massachusetts).
+
+Another way we could look at these scores is to see how the performance varies by time of year. Perhaps we are better at particular times of year at different horizons. Below we summarise the scores by horizon and date of forecast generation. For simplicity we will look just at one site.
+
+```{r}
+multiple_forecasts |> 
+  select(horizon, datetime, model_id, site_id, crps) |>
+  
+  filter(horizon %in% c(1,7,14,30),
+         year(datetime) == 2021) |>
+  
+  ggplot(aes(x = datetime, y = crps)) +
+  geom_line() + 
+  facet_wrap(~horizon)
+```
+
+On this plot we see an increase in CRPS from April (as the leaves come out) and distinct peak in May/June (probably around peak greenness), and this is even more pronounced at longer horizons. More research questions could be asked about particular sites and times of year are more or less predictability, but for now we'll move on to seeing if these patterns are consistent across models!
+
+### Comparing forecasts from different models
+
+```{r model-comp}
+model_id_subset <- c('UCSC_P_EDM', 'PEG')
+site_id_subset <- 'HARV'
+
+multi_model_forecasts <- arrow::open_dataset(phenology_scores_s3) |> 
+  dplyr::filter(model_id %in% model_id_subset,
+                site_id == site_id_subset) |> 
+  collect() |> 
+  distinct()
+
+multi_model_forecasts |> 
+  mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime)),
+         abs_error = abs(mean - observation), 
+         sq_error = (mean - observation)^2) |>   
+  filter(between(horizon, 1,30))  |> 
+  select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
+  reframe(.by = c(horizon, model_id, site_id),
+          rmse = sqrt(mean(sq_error, na.rm = T)),
+          mae = mean(abs_error, na.rm = T),
+          crps = mean(crps, na.rm = T)) |> 
+  pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
+  
+  ggplot(aes(x = horizon, y = value, colour = model_id)) +
+  geom_line() +
+  facet_wrap(~eval_metric)
+
+```
+
+### Skill scores
+
+A particularly useful comparison could be between your model of interest and a null or baseline model. This gives use some information about how much extra performance you gain (or not!) above a simple null model. From these comparisons with null models we can generate a *forecast skill score*. There are a few different ways to calculate these but they all basically calculate the difference in score (of whichever metric you choose) between the two. We will use the simplest metric using CRPS (model_crps - null_crps).
+
+We will need to grab the null model forecasts for this variable and site. We will use the climatology forecast as a reasonable baseline for the greening up process for terrestrial sites.
+
+```{r access-catalog5}
+model_id_subset <-  c('climatology')
+site_id_subset <- 'HARV'
+
+null_model_forecasts <- arrow::open_dataset(phenology_scores_s3) |> 
+  dplyr::filter(model_id %in% model_id_subset,
+                site_id == site_id_subset) |> 
+  collect() |> 
+  group_by(reference_datetime, datetime, variable, model_id) |> 
+  slice_head(n=1) |> ungroup()
+
+```
+
+We will compare our model of interest `UCSC_P_EDM` to the null by joining them together and looking at the difference between the scores.
+
+```{r calc-skill}
+bind_rows(null_model_forecasts, multiple_forecasts) |>
+  select(model_id, reference_datetime, datetime, crps) |> 
+  pivot_wider(names_from = model_id, 
+              values_from = crps) |> 
+  mutate(skill = UCSC_P_EDM - climatology,
+         horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
+  reframe(.by = c(horizon),
+          skill = mean(skill, na.rm = T)) |> 
+  filter(between(horizon, 1, 30)) |> 
+  ggplot(aes(x = horizon)) +
+  geom_line(aes(y = skill)) +
+  geom_hline(yintercept = 0) +
+  annotate('text', x = 5, y = 0.001, label = 'null better') +
+  annotate('text', x=5, y = -0.001, label = 'model better') 
+
+
+```
+
+At no horizon is our model of interest, on average, better than the null model :(
+
+For the aquatics challenge variables, here surface water temperature (`temperature`), we can do the same set of analyses!
+
+1.  Access catalog
+2.  Calculate average performance by horizon
+3.  Plot average performance by horizon
+
+```{r aquatic-example}
+# 1. Access catalog
+aquatic_scores_s3 <- "s3://anonymous@bio230014-bucket01/challenges/scores/bundled-parquet/project_id=neon4cast/duration=P1D/variable=temperature?endpoint_override=sdsc.osn.xsede.org"
+
+model_id_subset <-  c('climatology', 'flareGLM')
+site_id_subset <- 'BARC'
+
+aquatic_forecasts <- arrow::open_dataset(aquatic_scores_s3) |> 
+  dplyr::filter(model_id %in% model_id_subset,
+                site_id == site_id_subset) |> 
+  collect() |> 
+  group_by(reference_datetime, datetime, variable, model_id) |> 
+  slice_head(n=1) |> ungroup()
+
+# 2. calculate average evaluation metrics
+aquatic_forecasts |> 
+  filter(model_id == 'flareGLM') |> 
+  mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime)),
+         abs_error = abs(mean - observation), 
+         sq_error = (mean - observation)^2) |>   
+  filter(between(horizon, 1,30))  |> 
+  select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
+  reframe(.by = c(horizon, model_id, site_id),
+          rmse = sqrt(mean(sq_error, na.rm = T)),
+          mae = mean(abs_error, na.rm = T),
+          crps = mean(crps, na.rm = T)) |> 
+  pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
+
+
+# 3. plot evaluation metrics  
+  ggplot(aes(x = horizon, y = value, colour = model_id)) +
+  geom_line() +
+  facet_wrap(~eval_metric)
+```
+
+We see the same pattern of higher metrics (lower performance) as horizon increases... What about compared to our null climatology model?
+
+4.  Compare with a null model (skill scores)
+
+```{r aquatic-scores}
+# 4. calculate skill relative to null
+aquatic_forecasts |>
+  select(model_id, reference_datetime, datetime, crps) |> 
+  pivot_wider(names_from = model_id, 
+              values_from = crps) |> 
+  mutate(skill = flareGLM - climatology,
+         horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
+  
+# what is the average skill over horizon
+  reframe(.by = c(horizon),
+          skill = mean(skill, na.rm = T)) |> 
+  filter(between(horizon, 1, 30)) |> 
+  ggplot(aes(x = horizon)) +
+  geom_line(aes(y = skill)) +
+  geom_hline(yintercept = 0) +
+  annotate('text', x = 5, y = 0.1, label = 'null better') +
+  annotate('text', x = 5, y = -0.1, label = 'model better') 
+```
+
+We see that at the shortest horizons, our model (`flareGLM`) does better than the null but beyond a couple of weeks lead time the null climatology model does better
