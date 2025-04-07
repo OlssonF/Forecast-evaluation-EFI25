@@ -1,6 +1,7 @@
 ---
 title: "Forecast Evaluation"
 author: "Freya Olsson"
+bibliography: references.bib
 output:
   md_document: 
     variant: markdown_github
@@ -93,7 +94,7 @@ ggplot(single_forecast, aes(x=datetime)) +
   geom_point(aes(y = observation))
 ```
 
-We see that initially the forecast mean is close to the observations but as we get further into the future the forecast is less good. But how "less good" is it?
+We see that initially the forecast mean is close to the observations but as we get further into the future the forecast is less good. But how "less good" is it? We can use a variety of scoring metrics to evaluate the forecasts.
 
 ### Point forecast evaluation
 
@@ -132,6 +133,8 @@ But, remember these forecasts are probabilistic. They also include an estimation
 
 #### Forecast spread
 
+Looking at the spread or variance in the forecast will evaluate the precision of the forecast. A forecast with high variance is unlikely to be useful for decision making.
+
 ```{r}
 single_forecast |> 
   ggplot(aes(x = datetime)) +
@@ -146,19 +149,31 @@ single_forecast |>
   geom_point(aes(y = observation))
 ```
 
-#### CRPS
+We see that for this model, there is little change in the spread of the forecast across the horizon.
 
-```{r calculating-crps}
+#### Continuous Rank Probability Score
 
-```
+The continuous rank probability score, CRPS, is a scoring metric that accounts for both the accuracy and precision of the forecast presented as a distribution [@Gneiting2007] by comparing with an observation. Considering both accuracy and precision is important because a forecast that has a correct mean but large uncertainty should have a lower score than a forecast that is only slightly off but lower uncertainty. Using CRPS, a forecast can score equally well by being slightly less accurate but more precise. A very bad score would come from being overly confident (high precision) about an inaccurate forecast. We use the convention for CRPS where zero is the lowest possible and best score.
+
+Another similar metric is the ignorance or log score [@Jordan2019; @Smith2015], which is also included in the scores table.
+
+![The relationship between accuracy (mean) and precision (sd) when calculating CRPS](images/crps.png)
+
+The figure above highlights the trade-off between mean and standard deviation, with each isocline having the same CRPS.
+
+CRPS is calculated as part of the NEON Challenge scoring and included in the catalog. We can plot this in the same way as the other metrics.
 
 ```{r plotting-crps}
 single_forecast |> 
   ggplot(aes(x = datetime, y = crps)) +
   geom_line()
 ```
+Similar to our other metrics we observe an increase in CRPS at some intermediate dates. The lowest score (highest performance) is at the shortest horizon (dates closer to the forecast generation).
+
 
 #### Prediction interval reliability
+
+NEED TO ADD THE TEXT IN HEREE!!!
 
 ```{r reliability}
 single_forecast |> 
@@ -305,7 +320,7 @@ multi_model_forecasts |>
 
 ### Skill scores
 
-A particularly useful comparison could be between your model of interest and a null or baseline model. This gives use some information about how much extra performance you gain (or not!) above a simple null model. From these comparisons with null models we can generate a *forecast skill score*. There are a few different ways to calculate these but they all basically calculate the difference in score (of whichever metric you choose) between the two. We will use the simplest metric using CRPS (model_crps - null_crps).
+A particularly useful comparison could be between your model of interest and a null or baseline model, following best practices [@Lewis2022]. Comparing with a null model gives use some information about how much extra performance you gain (or not!) above a simple null model. From these comparisons with null models we can generate a *forecast skill score*. There are a few different ways to calculate these but they all basically calculate the difference in score (of whichever metric you choose) between the two. We will use the simplest metric using CRPS (model_crps - null_crps).
 
 We will need to grab the null model forecasts for this variable and site. We will use the climatology forecast as a reasonable baseline for the greening up process for terrestrial sites.
 
@@ -412,12 +427,25 @@ aquatic_forecasts |>
 
 We see that at the shortest horizons, our model (`flareGLM`) does better than the null but beyond a couple of weeks lead time the null climatology model does better.
 
-### Synthesis considerations
+## Take homes
 
--   are we making equal comparisons?
+In this tutorial, we have introduced a number of different forecast evaluation scores and metrics to start thinking about questions that can be asked from a forecast catalog. The different scores evaluate different aspects of the forecast (precision and accuracy and reliability) - and thus matching the metric to the question is important. For more about evaluating ecological forecasts see @Simonis2021.
 
-For the aquatics example we are comparing `r nrow(distinct(filter(aquatic_forecasts, model_id == 'climatology'), reference_datetime))` climatology forecasts to `nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` - is this okay? What about if our phenology model only forecasted greenness during the winter (easy) and not in spring (harder)?
+## Synthesis considerations
 
--   who generated the model? (authorship, contributions)
+If you were to start a model comparison project or a large synthesis evaluating forecasts across multiple sites or variables there are some considerations to be made.
 
--   what sources of uncertainty are represented in the forecast? to answer some questions about predictability it would be good to know more about the model being used and how the forecasts and uncertainty are generated.
+-   Are we making equal comparisons?
+
+For the aquatics example we are comparing `r nrow(distinct(filter(aquatic_forecasts, model_id == 'climatology'), reference_datetime))` climatology forecasts to `r nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` - is this okay? What about if our phenology model only forecasted greenness during the winter (easy) and not in spring (harder), would this be a fair comparison?
+
+-   what type of model was used and how are sources of uncertainty represented in the forecast?
+
+To answer some questions about large-scale predictability it would be good to know more about the model being used and how the forecasts and uncertainty are generated. Can we make generalizations about model types if we don't have sufficient metadata. Understanding what sources of uncertainty are and aren't included in a forecast could help explain predictive interval reliability, and inform the improvement of uncertainty representation. 
+
+
+-   who generated the model? 
+
+For synthesis projects that include a large catalog of forecasts (such as those from the NEON Challenge) determining authorship and contributions is important.
+
+What else needs considering?
