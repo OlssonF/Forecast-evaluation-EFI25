@@ -17,7 +17,8 @@
         -   [4.2.2 Comparing forecasts from different
             models](#comparing-forecasts-from-different-models)
         -   [4.2.3 Skill scores](#skill-scores)
-        -   [4.2.4 Synthesis considerations](#synthesis-considerations)
+    -   [4.3 Take homes](#take-homes)
+    -   [4.4 Synthesis considerations](#synthesis-considerations)
 
 # 1 Background on forecast evaluation
 
@@ -151,7 +152,8 @@ ggplot(single_forecast, aes(x=datetime)) +
 
 We see that initially the forecast mean is close to the observations but
 as we get further into the future the forecast is less good. But how
-“less good” is it?
+“less good” is it? We can use a variety of scoring metrics to evaluate
+the forecasts.
 
 ### 4.1.1 Point forecast evaluation
 
@@ -203,6 +205,10 @@ forecast.
 
 #### 4.1.2.1 Forecast spread
 
+Looking at the spread or variance in the forecast will evaluate the
+precision of the forecast. A forecast with high variance is unlikely to
+be useful for decision making.
+
 ``` r
 single_forecast |> 
   ggplot(aes(x = datetime)) +
@@ -221,7 +227,39 @@ single_forecast |>
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/unnamed-chunk-2-1.png)
 
-#### 4.1.2.2 CRPS
+We see that for this model, there is little change in the spread of the
+forecast across the horizon.
+
+#### 4.1.2.2 Continuous Rank Probability Score
+
+The continuous rank probability score, CRPS, is a scoring metric that
+accounts for both the accuracy and precision of the forecast presented
+as a distribution (Gneiting and Raftery 2007) by comparing with an
+observation. Considering both accuracy and precision is important
+because a forecast that has a correct mean but large uncertainty should
+have a lower score than a forecast that is only slightly off but lower
+uncertainty. Using CRPS, a forecast can score equally well by being
+slightly less accurate but more precise. A very bad score would come
+from being overly confident (high precision) about an inaccurate
+forecast. We use the convention for CRPS where zero is the lowest
+possible and best score.
+
+Another similar metric is the ignorance or log score (Jordan, Krüger,
+and Lerch 2019; Smith et al. 2015), which is also included in the scores
+table.
+
+<figure>
+<img src="images/crps.png"
+alt="The relationship between accuracy (mean) and precision (sd) when calculating CRPS" />
+<figcaption aria-hidden="true">The relationship between accuracy (mean)
+and precision (sd) when calculating CRPS</figcaption>
+</figure>
+
+The figure above highlights the trade-off between mean and standard
+deviation, with each isocline having the same CRPS.
+
+CRPS is calculated as part of the NEON Challenge scoring and included in
+the catalog. We can plot this in the same way as the other metrics.
 
 ``` r
 single_forecast |> 
@@ -230,8 +268,13 @@ single_forecast |>
 ```
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/plotting-crps-1.png)
+Similar to our other metrics we observe an increase in CRPS at some
+intermediate dates. The lowest score (highest performance) is at the
+shortest horizon (dates closer to the forecast generation).
 
 #### 4.1.2.3 Prediction interval reliability
+
+NEED TO ADD THE TEXT IN HEREE!!!
 
 ``` r
 single_forecast |> 
@@ -431,7 +474,8 @@ multi_model_forecasts |>
 ### 4.2.3 Skill scores
 
 A particularly useful comparison could be between your model of interest
-and a null or baseline model. This gives use some information about how
+and a null or baseline model, following best practices (Lewis et al.
+2022). Comparing with a null model gives use some information about how
 much extra performance you gain (or not!) above a simple null model.
 From these comparisons with null models we can generate a *forecast
 skill score*. There are a few different ways to calculate these but they
@@ -555,18 +599,70 @@ We see that at the shortest horizons, our model (`flareGLM`) does better
 than the null but beyond a couple of weeks lead time the null
 climatology model does better.
 
-### 4.2.4 Synthesis considerations
+## 4.3 Take homes
 
--   are we making equal comparisons?
+In this tutorial, we have introduced a number of different forecast
+evaluation scores and metrics to start thinking about questions that can
+be asked from a forecast catalog. The different scores evaluate
+different aspects of the forecast (precision and accuracy and
+reliability) - and thus matching the metric to the question is
+important. For more about evaluating ecological forecasts see Simonis,
+White, and Ernest (2021).
 
-For the aquatics example we are comparing 1028 climatology forecasts to
-`nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` -
-is this okay? What about if our phenology model only forecasted
-greenness during the winter (easy) and not in spring (harder)?
+## 4.4 Synthesis considerations
 
--   who generated the model? (authorship, contributions)
+If you were to start a model comparison project or a large synthesis
+evaluating forecasts across multiple sites or variables there are some
+considerations to be made.
 
--   what sources of uncertainty are represented in the forecast? to
-    answer some questions about predictability it would be good to know
-    more about the model being used and how the forecasts and
-    uncertainty are generated.
+-   Are we making equal comparisons?
+
+For the aquatics example we are comparing 1031 climatology forecasts to
+844 - is this okay? What about if our phenology model only forecasted
+greenness during the winter (easy) and not in spring (harder), would
+this be a fair comparison?
+
+-   what type of model was used and how are sources of uncertainty
+    represented in the forecast?
+
+To answer some questions about large-scale predictability it would be
+good to know more about the model being used and how the forecasts and
+uncertainty are generated. Can we make generalizations about model types
+if we don’t have sufficient metadata. Understanding what sources of
+uncertainty are and aren’t included in a forecast could help explain
+predictive interval reliability, and inform the improvement of
+uncertainty representation.
+
+-   who generated the model?
+
+For synthesis projects that include a large catalog of forecasts (such
+as those from the NEON Challenge) determining authorship and
+contributions is important.
+
+What else needs considering?
+
+Gneiting, Tilmann, and Adrian E. Raftery. 2007.
+“<span class="nocase">Strictly proper scoring rules, prediction, and
+estimation</span>.” *Journal of the American Statistical Association*
+102 (477): 359–78. <https://doi.org/10.1198/016214506000001437>.
+
+Jordan, Alexander, Fabian Krüger, and Sebastian Lerch. 2019.
+“<span class="nocase">Evaluating Probabilistic Forecasts with
+scoringRules</span>.” *Journal of Statistical Software* 90 (12): 1–37.
+<https://doi.org/10.18637/jss.v090.i12>.
+
+Lewis, Abigail S. L. L., Whitney M. Woelmer, Heather L. Wander, Dexter
+W. Howard, John W. Smith, Ryan P. McClure, Mary E. Lofton, et al. 2022.
+“<span class="nocase">Increased adoption of best practices in ecological
+forecasting enables comparisons of forecastability</span>.” *Ecological
+Applications* 32 (2): e02500. <https://doi.org/10.1002/eap.2500>.
+
+Simonis, Juniper L., Ethan P. White, and S. K.Morgan Ernest. 2021.
+“<span class="nocase">Evaluating probabilistic ecological
+forecasts</span>.” *Ecology* 102 (8): 1–8.
+<https://doi.org/10.1002/ecy.3431>.
+
+Smith, Leonard A., Emma B. Suckling, Erica L. Thompson, Trevor Maynard,
+and Hailiang Du. 2015. “<span class="nocase">Towards improving the
+framework for probabilistic forecast evaluation</span>.” *Climatic
+Change* 132 (1): 31–45. <https://doi.org/10.1007/s10584-015-1430-2>.
