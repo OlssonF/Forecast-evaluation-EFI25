@@ -17,8 +17,9 @@
         -   [4.2.2 Comparing forecasts from different
             models](#comparing-forecasts-from-different-models)
         -   [4.2.3 Skill scores](#skill-scores)
-    -   [4.3 Take homes](#take-homes)
-    -   [4.4 Synthesis considerations](#synthesis-considerations)
+-   [5 Take homes](#take-homes)
+-   [6 Further considerations](#further-considerations)
+-   [7 References](#references)
 
 # 1 Background on forecast evaluation
 
@@ -268,6 +269,7 @@ single_forecast |>
 ```
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/plotting-crps-1.png)
+
 Similar to our other metrics we observe an increase in CRPS at some
 intermediate dates. The lowest score (highest performance) is at the
 shortest horizon (dates closer to the forecast generation).
@@ -428,7 +430,7 @@ multiple_forecasts |>
   
   ggplot(aes(x = datetime, y = crps)) +
   geom_line() + 
-  facet_wrap(~horizon)
+  facet_wrap(~horizon, labeller = label_both)
 ```
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/unnamed-chunk-3-1.png)
@@ -599,7 +601,7 @@ We see that at the shortest horizons, our model (`flareGLM`) does better
 than the null but beyond a couple of weeks lead time the null
 climatology model does better.
 
-## 4.3 Take homes
+# 5 Take homes
 
 In this tutorial, we have introduced a number of different forecast
 evaluation scores and metrics to start thinking about questions that can
@@ -609,7 +611,7 @@ reliability) - and thus matching the metric to the question is
 important. For more about evaluating ecological forecasts see Simonis,
 White, and Ernest (2021).
 
-## 4.4 Synthesis considerations
+# 6 Further considerations
 
 If you were to start a model comparison project or a large synthesis
 evaluating forecasts across multiple sites or variables there are some
@@ -639,7 +641,9 @@ For synthesis projects that include a large catalog of forecasts (such
 as those from the NEON Challenge) determining authorship and
 contributions is important.
 
-What else needs considering?
+**What else needs considering?**
+
+# 7 References
 
 Gneiting, Tilmann, and Adrian E. Raftery. 2007.
 “<span class="nocase">Strictly proper scoring rules, prediction, and
