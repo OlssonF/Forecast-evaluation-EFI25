@@ -168,8 +168,8 @@ single_forecast |>
   ggplot(aes(x = datetime, y = crps)) +
   geom_line()
 ```
-Similar to our other metrics we observe an increase in CRPS at some intermediate dates. The lowest score (highest performance) is at the shortest horizon (dates closer to the forecast generation).
 
+Similar to our other metrics we observe an increase in CRPS at some intermediate dates. The lowest score (highest performance) is at the shortest horizon (dates closer to the forecast generation).
 
 #### Prediction interval reliability
 
@@ -283,7 +283,7 @@ multiple_forecasts |>
   
   ggplot(aes(x = datetime, y = crps)) +
   geom_line() + 
-  facet_wrap(~horizon)
+  facet_wrap(~horizon, labeller = label_both)
 ```
 
 On this plot we see an increase in CRPS from April (as the leaves come out) and distinct peak in May/June (probably around peak greenness), and this is even more pronounced at longer horizons. More research questions could be asked about particular sites and times of year are more or less predictability, but for now we'll move on to seeing if these patterns are consistent across models!
@@ -427,11 +427,11 @@ aquatic_forecasts |>
 
 We see that at the shortest horizons, our model (`flareGLM`) does better than the null but beyond a couple of weeks lead time the null climatology model does better.
 
-## Take homes
+# Take homes
 
 In this tutorial, we have introduced a number of different forecast evaluation scores and metrics to start thinking about questions that can be asked from a forecast catalog. The different scores evaluate different aspects of the forecast (precision and accuracy and reliability) - and thus matching the metric to the question is important. For more about evaluating ecological forecasts see @Simonis2021.
 
-## Synthesis considerations
+# Further considerations
 
 If you were to start a model comparison project or a large synthesis evaluating forecasts across multiple sites or variables there are some considerations to be made.
 
@@ -441,11 +441,12 @@ For the aquatics example we are comparing `r nrow(distinct(filter(aquatic_foreca
 
 -   what type of model was used and how are sources of uncertainty represented in the forecast?
 
-To answer some questions about large-scale predictability it would be good to know more about the model being used and how the forecasts and uncertainty are generated. Can we make generalizations about model types if we don't have sufficient metadata. Understanding what sources of uncertainty are and aren't included in a forecast could help explain predictive interval reliability, and inform the improvement of uncertainty representation. 
+To answer some questions about large-scale predictability it would be good to know more about the model being used and how the forecasts and uncertainty are generated. Can we make generalizations about model types if we don't have sufficient metadata. Understanding what sources of uncertainty are and aren't included in a forecast could help explain predictive interval reliability, and inform the improvement of uncertainty representation.
 
-
--   who generated the model? 
+-   who generated the model?
 
 For synthesis projects that include a large catalog of forecasts (such as those from the NEON Challenge) determining authorship and contributions is important.
 
-What else needs considering?
+**What else needs considering?**
+
+# References
