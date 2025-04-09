@@ -278,7 +278,7 @@ multi_site_forecasts |>
 
 ```
 
-We see that the performance at CLBJ )(Lyndon B. Johnson National Grassland, in Texas is higher than at HARV (Harvard Forest, Massachusetts).
+We see that the performance at CLBJ (Lyndon B. Johnson National Grassland, Texas) is higher than at HARV (Harvard Forest, Massachusetts).
 
 Another way we could look at these scores is to see how the performance varies by time of year. Perhaps we are better at particular times of year at different horizons. Below we summarise the scores by horizon and date of forecast generation. For simplicity we will look just at one site.
 
