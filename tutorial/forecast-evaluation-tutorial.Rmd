@@ -124,9 +124,10 @@ single_forecast |>
          abs_error = abs(mean - observation),
          sq_error = (mean - observation)^2) |> 
   select(datetime, reference_datetime, model_id, site_id, error, abs_error, sq_error) |> 
-  reframe(.by = c(reference_datetime, model_id, site_id),
-          rmse = sqrt(mean(sq_error)),
-          mae = mean(abs_error))
+  group_by(reference_datetime, model_id, site_id) |> 
+  summarise(rmse = sqrt(mean(sq_error)),
+            mae = mean(abs_error),
+            .groups = 'drop')
 ```
 
 ### Probabilistic forecast evaluation
@@ -142,9 +143,6 @@ single_forecast |>
   ggplot(aes(x = datetime)) +
   geom_line(aes(y = sd))
 ```
-
-
-
 
 ```{r}
 single_forecast |> 
@@ -180,26 +178,26 @@ Similar to our other metrics we observe an increase in CRPS at some intermediate
 
 NEED TO ADD THE TEXT IN HEREE!!! - Added start (CR):
 
-We can also plot the 95% prediction interval to check forecasts that may be poorly predicted by our model. This provides a check on whether model uncertainty is poorly calibrated. Models that produce many forecasts with observations outside the 95% prediction interval are overconfident, and those that have >>95% of the observations inside the 95% prediction interval are underconfident. 
+We can also plot the 95% prediction interval to check forecasts that may be poorly predicted by our model. This provides a check on whether model uncertainty is poorly calibrated. Models that produce many forecasts with observations outside the 95% prediction interval are overconfident, and those that have \>\>95% of the observations inside the 95% prediction interval are underconfident.
 
 ```{r reliability}
 single_forecast |> 
   mutate(within_PI = between(observation, quantile02.5, quantile97.5)) |> 
   select(model_id, site_id, datetime, observation, quantile10, quantile90, within_PI) |> 
-  reframe(.by = c(model_id, site_id, within_PI),
-          n = n()) |> 
+  group_by(model_id, site_id, within_PI) |> 
+  summarise(n = n(), 
+            .groups = 'drop') |> 
   pivot_wider(names_from = within_PI, names_prefix = 'within_', values_from = n, values_fill = 0) |> 
   mutate(obs_relative = within_TRUE/(within_FALSE + within_TRUE)*100) 
 ```
 
-
 ## Evaluating multiple forecasts
 
-This is a useful starting point for thinking about evaluation metrics. However, we can begin to learn more by evaluating more forecasts and beginning to gain understanding on the *general patterns* or to make *comparisons* among models.
+This is a useful starting point for thinking about evaluation metrics. However, we can begin to learn more by evaluating more forecasts and beginning to gain understanding on the general patterns or to make comparisons among models.
 
-1.  Comparing more forecasts from the same model - do the patterns we have observed in the single forecast evaluation hold for more forecasts. We can start to ask questions about the overall *predictability* of the variable using this model. Maybe this performance we observed was just a one off or maybe it is part of a pattern. We can only start to answer these questions by evaluating more forecasts.
+1.  Comparing more forecasts from the same model - do the patterns we have observed in the single forecast evaluation hold for more forecasts. We can start to ask questions about the overall predictability of the variable using this model. Maybe this performance we observed was just a one off or maybe it is part of a pattern. We can only start to answer these questions by evaluating more forecasts.
 
-2.  Comparing forecasts from different models - how does our model compare to other model forecasts? These comparisons could be done with models with different configurations or parameters in a model selection framework or as a way to learn about predictability among models. One useful comparison is to compare forecast scores with those produces by a null or baseline model, calculating a relative *skill*.
+2.  Comparing forecasts from different models - how does our model compare to other model forecasts? These comparisons could be done with models with different configurations or parameters in a model selection framework or as a way to learn about predictability among models. One useful comparison is to compare forecast scores with those produces by a null or baseline model, calculating a relative skill.
 
 ### Finding patterns in model evaluation
 
@@ -236,10 +234,11 @@ multiple_forecasts |>
   mutate(abs_error = abs(mean - observation), 
          sq_error = (mean - observation)^2) |> 
   select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
-  reframe(.by = c(horizon, model_id, site_id),
-          rmse = sqrt(mean(sq_error, na.rm = T)),
-          mae = mean(abs_error, na.rm = T),
-          crps = mean(crps, na.rm = T)) |> 
+  group_by(horizon, model_id, site_id) |> 
+  summarise(rmse = sqrt(mean(sq_error, na.rm = T)),
+            mae = mean(abs_error, na.rm = T),
+            crps = mean(crps, na.rm = T),
+            groups = 'drop') |> 
   pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
   
   ggplot(aes(x = horizon, y = value)) +
@@ -266,10 +265,11 @@ multi_site_forecasts |>
   mutate(abs_error = abs(mean - observation), 
          sq_error = (mean - observation)^2) |> 
   select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
-  reframe(.by = c(horizon, model_id, site_id),
-          rmse = sqrt(mean(sq_error, na.rm = T)),
-          mae = mean(abs_error, na.rm = T),
-          crps = mean(crps, na.rm = T)) |> 
+  group_by(horizon, model_id, site_id) |> 
+  summarise(rmse = sqrt(mean(sq_error, na.rm = T)),
+            mae = mean(abs_error, na.rm = T),
+            crps = mean(crps, na.rm = T), 
+            groups = 'drop') |> 
   pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
   
   ggplot(aes(x = horizon, y = value, colour = site_id)) +
@@ -314,10 +314,11 @@ multi_model_forecasts |>
          sq_error = (mean - observation)^2) |>   
   filter(between(horizon, 1,30))  |> 
   select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
-  reframe(.by = c(horizon, model_id, site_id),
-          rmse = sqrt(mean(sq_error, na.rm = T)),
-          mae = mean(abs_error, na.rm = T),
-          crps = mean(crps, na.rm = T)) |> 
+  group_by(horizon, model_id, site_id) |> 
+  summarise(rmse = sqrt(mean(sq_error, na.rm = T)),
+            mae = mean(abs_error, na.rm = T),
+            crps = mean(crps, na.rm = T),
+            groups = 'drop') |> 
   pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
   
   ggplot(aes(x = horizon, y = value, colour = model_id)) +
@@ -328,7 +329,7 @@ multi_model_forecasts |>
 
 ### Skill scores
 
-A particularly useful comparison could be between your model of interest and a null or baseline model, following best practices [@Lewis2022]. Comparing with a null model gives use some information about how much extra performance you gain (or not!) above a simple null model. From these comparisons with null models we can generate a *forecast skill score*. There are a few different ways to calculate these but they all basically calculate the difference in score (of whichever metric you choose) between the two. We will use the simplest metric using CRPS (model_crps - null_crps).
+A particularly useful comparison could be between your model of interest and a null or baseline model, following best practices [@Lewis2022]. Comparing with a null model gives use some information about how much extra performance you gain (or not!) above a simple null model. From these comparisons with null models we can generate a forecast skill score. There are a few different ways to calculate these but they all basically calculate the difference in score (of whichever metric you choose) between the two. We will use the simplest metric using CRPS (model_crps - null_crps).
 
 We will need to grab the null model forecasts for this variable and site. We will use the climatology forecast as a reasonable baseline for the greening up process for terrestrial sites.
 
@@ -345,7 +346,7 @@ null_model_forecasts <- arrow::open_dataset(phenology_scores_s3) |>
 
 ```
 
-We will compare our model of interest `UCSC_P_EDM` to the null by joining them together and looking at the difference between the scores. As calculated, a positive difference implies better performance of the climatology null model. 
+We will compare our model of interest `UCSC_P_EDM` to the null by joining them together and looking at the difference between the scores. As calculated, a positive difference implies better performance of the climatology null model.
 
 ```{r calc-skill}
 bind_rows(null_model_forecasts, multiple_forecasts) |>
@@ -354,8 +355,8 @@ bind_rows(null_model_forecasts, multiple_forecasts) |>
               values_from = crps) |> 
   mutate(skill = UCSC_P_EDM - climatology,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
-  reframe(.by = c(horizon),
-          skill = mean(skill, na.rm = T)) |> 
+  group_by(horizon) |> 
+  summarise(skill = mean(skill, na.rm = T), groups = 'drop') |> 
   filter(between(horizon, 1, 30)) |> 
   ggplot(aes(x = horizon)) +
   geom_line(aes(y = skill)) +
@@ -396,14 +397,15 @@ aquatic_forecasts |>
          sq_error = (mean - observation)^2) |>   
   filter(between(horizon, 1,30))  |> 
   select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
-  reframe(.by = c(horizon, model_id, site_id),
-          rmse = sqrt(mean(sq_error, na.rm = T)),
-          mae = mean(abs_error, na.rm = T),
-          crps = mean(crps, na.rm = T)) |> 
+  group_by(horizon, model_id, site_id) |> 
+  summarise(rmse = sqrt(mean(sq_error, na.rm = T)),
+            mae = mean(abs_error, na.rm = T),
+            crps = mean(crps, na.rm = T),
+            groups = 'drop') |> 
   pivot_longer(cols = rmse:crps, names_to = 'eval_metric', values_to = 'value') |> 
-
-
-# 3. plot evaluation metrics  
+  
+  
+  # 3. plot evaluation metrics  
   ggplot(aes(x = horizon, y = value, colour = model_id)) +
   geom_line() +
   facet_wrap(~eval_metric)
@@ -422,9 +424,10 @@ aquatic_forecasts |>
   mutate(skill = flareGLM - climatology,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
   
-# what is the average skill over horizon
-  reframe(.by = c(horizon),
-          skill = mean(skill, na.rm = T)) |> 
+  # what is the average skill over horizon
+  group_by(horizon) |> 
+  summarise(skill = mean(skill, na.rm = T),
+            .groups = 'drop') |> 
   filter(between(horizon, 1, 30)) |> 
   ggplot(aes(x = horizon)) +
   geom_line(aes(y = skill)) +
@@ -443,7 +446,7 @@ In this tutorial, we have introduced a number of different forecast evaluation s
 
 If you were to start a model comparison project or a large synthesis evaluating forecasts across multiple sites or variables there are some considerations to be made.
 
--   Are we making equal comparisons?
+-   are we making equal comparisons?
 
 For the aquatics example we are comparing `r nrow(distinct(filter(aquatic_forecasts, model_id == 'climatology'), reference_datetime))` climatology forecasts to `r nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` - is this okay? What about if our phenology model only forecasted greenness during the winter (easy) and not in spring (harder), would this be a fair comparison?
 
