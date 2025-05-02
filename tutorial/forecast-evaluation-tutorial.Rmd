@@ -29,6 +29,7 @@ These workshop materials will take you through some simple forecast evaluation e
 ```{r required-packages, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(arrow)
+library(kableExtra)
 
 # if you need to download either of these packages uncomment this line!
 # install.packages(c('tidyverse','arrow'))
@@ -440,7 +441,22 @@ We see that at the shortest horizons, our model (`flareGLM`) does better than th
 
 # Take homes
 
-In this tutorial, we have introduced a number of different forecast evaluation scores and metrics to start thinking about questions that can be asked from a forecast catalog. The different scores evaluate different aspects of the forecast (precision and accuracy and reliability) - and thus matching the metric to the question is important. For more about evaluating ecological forecasts see @Simonis2021.
+In this tutorial, we have introduced a number of different forecast evaluation scores and metrics to start thinking about questions that can be asked from a forecast catalog. The different scores evaluate different aspects of the forecast (precision and accuracy and reliability) - and thus matching the metric to the question is important. For more about evaluating ecological forecasts see @Simonis2021 and @Dietze2017 (Ch. 16).
+
+```{r summary table, echo = FALSE}
+table <- tibble(Metric = c("RMSE", "R<sup>2</sup>", "Bias", "CRPS","Brier Score"),
+                Type = c( "Point", "Point", "Point", "Probabilistic", "Probabilistic"),
+                Description = c("Approximately, standard deviation of error", 
+                                "Correlation of prediction and observation", 
+                                "Forecasted means - Observed means", 
+                                "Favors both accuracy and precision", 
+                                "For binary/categorical outcomes"))
+
+
+# need to make sure to cite Mike's book, Ch. 16 in particular
+kable(table, escape = FALSE)
+
+```
 
 # Further considerations
 

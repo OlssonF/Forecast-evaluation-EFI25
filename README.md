@@ -16,6 +16,7 @@ The following packages need to be installed using the following code.
 install.packages('tidyverse') # collection of R packages for data manipulation, analysis, and visualisation
 install.packages('lubridate') # working with dates and times
 install.packages('arrow') # accessing remote filesystems and reading/writing parquet files
+install.packages(`kableExtra`) # help render tables nicely
 ```
 
 ### Get the code
