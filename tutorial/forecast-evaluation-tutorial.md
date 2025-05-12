@@ -141,7 +141,16 @@ single_forecast <- arrow::open_dataset(phenology_scores_s3) |>
                 reference_datetime == reference_date_subset) |> 
   collect() |> 
   distinct()
+
+single_forecast |> 
+  ggplot(aes(x=datetime)) +
+  geom_ribbon(aes(ymax = quantile97.5, ymin = quantile02.5), alpha = 0.3) +
+  geom_line(aes(y = mean)) +
+  geom_point(aes(y = observation)) +
+  ylab(expression(bold(G[CC])))
 ```
+
+![](forecast-evaluation-tutorial_files/figure-markdown_github/access-catalog2-1.png)
 
 We can plot the mean prediction (solid line) compared to the
 observations (points) as a visual starting point for evaluating that
@@ -224,6 +233,9 @@ single_forecast |>
 ```
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/unnamed-chunk-1-1.png)
+Plotting the forecast with its predictive intervals as well as the
+observations starts to show us the performance of the whole forecast
+distribution relative to the observations:
 
 ``` r
 single_forecast |> 
@@ -253,9 +265,9 @@ from being overly confident (high precision) about an inaccurate
 forecast. We use the convention for CRPS where zero is the lowest
 possible and best score.
 
-Another similar metric is the ignorance or log score (Jordan, Krüger,
-and Lerch 2019; Smith et al. 2015), which is also included in the scores
-table.
+Another similar metric is the ignorance or logarithic (log) score
+(Jordan, Krüger, and Lerch 2019; Smith et al. 2015), which is also
+included in the scores table.
 
 <figure>
 <img src="images/crps.png"
@@ -385,8 +397,8 @@ multiple_forecasts <- multiple_forecasts |>
 
 We can then summarise some of our metrics across horizon, to see how
 generally the model performs at different times into the future. Below
-we calculate the bias, rmse, sd, and crps (from the pre-scored column in
-the scores).
+we calculate the mae, rmse, and crps (from the pre-scored column in the
+scores).
 
 ``` r
 multiple_forecasts |> 
@@ -491,8 +503,8 @@ multi_site_forecasts |>
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/access-catalog4-2.png)
 
 We see that the performance at CLBJ (Lyndon B. Johnson National
-Grassland, Texas) is higher than at HARV (Harvard Forest,
-Massachusetts).
+Grassland, Texas) is higher than at HARV (Harvard Forest, Massachusetts)
+and that the CLBJ forecasts are consistently underconfident.
 
 Another way we could look at these scores is to see how the performance
 varies by time of year. Perhaps we are better at particular times of
@@ -516,12 +528,16 @@ multiple_forecasts |>
 
 On this plot we see an increase in CRPS from April (as the leaves come
 out) and distinct peak in May/June (probably around peak greenness), and
-this is even more pronounced at longer horizons. More research questions
-could be asked about particular sites and times of year are more or less
+this is even more pronounced at longer horizons. There is a second peak
+in the fall when leaf off occurs. More research questions could be asked
+about why particular sites and times of year are more or less
 predictability, but for now we’ll move on to seeing if these patterns
 are consistent across models!
 
 ### 4.2.2 Comparing forecasts from different models
+
+We will extract a second model’s forecasts for the Harvard forest
+greenness - the `PEG` model.
 
 ``` r
 model_id_subset <- c('UCSC_P_EDM', 'PEG')
@@ -664,7 +680,8 @@ aquatic_forecasts |>
   mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime)),
          abs_error = abs(mean - observation), 
          sq_error = (mean - observation)^2) |>   
-  filter(between(horizon, 1,30))  |> 
+  filter(between(horizon, 1,30),
+         model_id == 'flareGLM')  |> 
   select(horizon, reference_datetime, model_id, site_id, abs_error, sq_error, crps) |> 
   group_by(horizon, model_id, site_id) |> 
   summarise(rmse = sqrt(mean(sq_error, na.rm = T)),
@@ -736,9 +753,9 @@ aquatic_forecasts |>
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/aquatic-scores-1.png)
 
-We see that at the shortest horizons, our model (`flareGLM`) does better
-than the null but beyond a couple of weeks lead time the null
-climatology model does better.
+We see that at the shortest horizons, the model of interest (`flareGLM`)
+does better than the null but beyond a couple of weeks lead time the
+null climatology model does better.
 
 # 5 Take homes
 
@@ -865,7 +882,7 @@ considerations to be made.
 
 -   are we making equal comparisons?
 
-For the aquatics example we are comparing 1059 climatology forecasts to
+For the aquatics example we are comparing 1060 climatology forecasts to
 863 flareGLM forecasts - is this okay? What about if our phenology model
 only forecasted greenness during the winter (easy) and not in spring
 (harder), would this be a fair comparison?
