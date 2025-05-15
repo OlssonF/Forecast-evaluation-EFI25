@@ -142,15 +142,42 @@ single_forecast <- arrow::open_dataset(phenology_scores_s3) |>
   collect() |> 
   distinct()
 
+glimpse(single_forecast)
+```
+
+    ## Rows: 35
+    ## Columns: 19
+    ## $ reference_datetime <dttm> 2021-05-01, 2021-05-01, 2021-05-01, 2021-05-01, 20…
+    ## $ site_id            <chr> "HARV", "HARV", "HARV", "HARV", "HARV", "HARV", "HA…
+    ## $ datetime           <dttm> 2021-05-01, 2021-05-02, 2021-05-03, 2021-05-04, 20…
+    ## $ family             <chr> "normal", "normal", "normal", "normal", "normal", "…
+    ## $ pub_datetime       <dttm> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+    ## $ observation        <dbl> 0.33049, 0.33312, 0.33543, 0.33667, 0.33682, 0.3326…
+    ## $ crps               <dbl> 0.004260245, 0.004297509, 0.004528762, 0.004629344,…
+    ## $ logs               <dbl> -3.09169770, -3.08527259, -3.06442801, -3.05266459,…
+    ## $ mean               <dbl> 0.3317629, 0.3316124, 0.3320309, 0.3328100, 0.33387…
+    ## $ median             <dbl> 0.3317629, 0.3316124, 0.3320309, 0.3328100, 0.33387…
+    ## $ sd                 <dbl> 0.01807699, 0.01817604, 0.01830450, 0.01843462, 0.0…
+    ## $ quantile97.5       <dbl> 0.3671931, 0.3672367, 0.3679071, 0.3689412, 0.37025…
+    ## $ quantile02.5       <dbl> 0.2963326, 0.2959880, 0.2961547, 0.2966788, 0.29749…
+    ## $ quantile90         <dbl> 0.3614969, 0.3615093, 0.3621391, 0.3631323, 0.36440…
+    ## $ quantile10         <dbl> 0.3020289, 0.3017154, 0.3019227, 0.3024878, 0.30334…
+    ## $ duration           <chr> "P1D", "P1D", "P1D", "P1D", "P1D", "P1D", "P1D", "P…
+    ## $ model_id           <chr> "UCSC_P_EDM", "UCSC_P_EDM", "UCSC_P_EDM", "UCSC_P_E…
+    ## $ project_id         <chr> "neon4cast", "neon4cast", "neon4cast", "neon4cast",…
+    ## $ variable           <chr> "gcc_90", "gcc_90", "gcc_90", "gcc_90", "gcc_90", "…
+
+A plot of this forecast (median + 95% CI), looks like this:
+
+``` r
 single_forecast |> 
   ggplot(aes(x=datetime)) +
   geom_ribbon(aes(ymax = quantile97.5, ymin = quantile02.5), alpha = 0.3) +
   geom_line(aes(y = mean)) +
-  geom_point(aes(y = observation)) +
   ylab(expression(bold(G[CC])))
 ```
 
-![](forecast-evaluation-tutorial_files/figure-markdown_github/access-catalog2-1.png)
+![](forecast-evaluation-tutorial_files/figure-markdown_github/single-forecast-1.png)
 
 We can plot the mean prediction (solid line) compared to the
 observations (points) as a visual starting point for evaluating that
@@ -312,7 +339,7 @@ predictive intervals</figcaption>
 </figure>
 
 For our single reference date analysis we could look at whether each
-observations falls inside or outside the forecast intervals
+observations falls inside or outside the forecast intervals.
 
 ``` r
 single_forecast |> 
@@ -392,7 +419,7 @@ and the datetime.
 ``` r
 multiple_forecasts <- multiple_forecasts |> 
   mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |> 
-  filter(between(horizon, 1,30)) 
+  filter(between(horizon, 1, 30)) 
 ```
 
 We can then summarise some of our metrics across horizon, to see how
@@ -635,7 +662,7 @@ bind_rows(null_model_forecasts, multiple_forecasts) |>
   select(model_id, reference_datetime, datetime, crps) |> 
   pivot_wider(names_from = model_id, 
               values_from = crps) |> 
-  mutate(skill = UCSC_P_EDM - climatology,
+  mutate(skill =  climatology - UCSC_P_EDM,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
   group_by(horizon) |> 
   summarise(skill = mean(skill, na.rm = T), groups = 'drop') |> 
@@ -643,8 +670,8 @@ bind_rows(null_model_forecasts, multiple_forecasts) |>
   ggplot(aes(x = horizon)) +
   geom_line(aes(y = skill)) +
   geom_hline(yintercept = 0) +
-  annotate('text', x = 5, y = 0.001, label = 'null better') +
-  annotate('text', x=5, y = -0.001, label = 'model better') 
+  annotate('text', x = 5, y = -0.001, label = 'null better') +
+  annotate('text', x=5, y = 0.001, label = 'model better') 
 ```
 
 ![](forecast-evaluation-tutorial_files/figure-markdown_github/calc-skill-1.png)
@@ -736,7 +763,7 @@ aquatic_forecasts |>
   select(model_id, reference_datetime, datetime, crps) |> 
   pivot_wider(names_from = model_id, 
               values_from = crps) |> 
-  mutate(skill = flareGLM - climatology,
+  mutate(skill = climatology - flareGLM,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
   
   # what is the average skill over horizon
@@ -882,8 +909,9 @@ considerations to be made.
 
 -   are we making equal comparisons?
 
-For the aquatics example we are comparing 1060 climatology forecasts to
-863 flareGLM forecasts - is this okay? What about if our phenology model
+For the phenology example we are comparing 341 PEG forecasts to
+`nrow(distinct(filter(multi_model_forecasts, model_id == 'UCSC_P_EDM'), reference_datetime))`
+UCSC_P_EDM forecasts - is this okay? What about if one of the models
 only forecasted greenness during the winter (easy) and not in spring
 (harder), would this be a fair comparison?
 

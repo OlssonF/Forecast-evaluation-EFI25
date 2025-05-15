@@ -86,11 +86,16 @@ single_forecast <- arrow::open_dataset(phenology_scores_s3) |>
   collect() |> 
   distinct()
 
+glimpse(single_forecast)
+```
+
+A plot of this forecast (median + 95% CI), looks like this:
+
+```{r single-forecast}
 single_forecast |> 
   ggplot(aes(x=datetime)) +
   geom_ribbon(aes(ymax = quantile97.5, ymin = quantile02.5), alpha = 0.3) +
   geom_line(aes(y = mean)) +
-  geom_point(aes(y = observation)) +
   ylab(expression(bold(G[CC])))
 ```
 
@@ -190,7 +195,7 @@ By plotting the 95% PE we can check whether model uncertainty is well calibrated
 
 ![Example showing reliability of forecast predictive intervals](images/reliability.png)
 
-For our single reference date analysis we could look at whether each observations falls inside or outside the forecast intervals
+For our single reference date analysis we could look at whether each observations falls inside or outside the forecast intervals.
 
 ```{r reliability}
 single_forecast |> 
@@ -237,7 +242,7 @@ Firstly, we can look at how the performance varies by lead time (or horizon). To
 ```{r calc-horizon}
 multiple_forecasts <- multiple_forecasts |> 
   mutate(horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |> 
-  filter(between(horizon, 1,30)) 
+  filter(between(horizon, 1, 30)) 
 ```
 
 We can then summarise some of our metrics across horizon, to see how generally the model performs at different times into the future. Below we calculate the mae, rmse, and crps (from the pre-scored column in the scores).
@@ -428,7 +433,7 @@ bind_rows(null_model_forecasts, multiple_forecasts) |>
   select(model_id, reference_datetime, datetime, crps) |> 
   pivot_wider(names_from = model_id, 
               values_from = crps) |> 
-  mutate(skill = UCSC_P_EDM - climatology,
+  mutate(skill =  climatology - UCSC_P_EDM,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
   group_by(horizon) |> 
   summarise(skill = mean(skill, na.rm = T), groups = 'drop') |> 
@@ -436,8 +441,8 @@ bind_rows(null_model_forecasts, multiple_forecasts) |>
   ggplot(aes(x = horizon)) +
   geom_line(aes(y = skill)) +
   geom_hline(yintercept = 0) +
-  annotate('text', x = 5, y = 0.001, label = 'null better') +
-  annotate('text', x=5, y = -0.001, label = 'model better') 
+  annotate('text', x = 5, y = -0.001, label = 'null better') +
+  annotate('text', x=5, y = 0.001, label = 'model better') 
 
 
 ```
@@ -517,7 +522,7 @@ aquatic_forecasts |>
   select(model_id, reference_datetime, datetime, crps) |> 
   pivot_wider(names_from = model_id, 
               values_from = crps) |> 
-  mutate(skill = flareGLM - climatology,
+  mutate(skill = climatology - flareGLM,
          horizon = as.numeric(as_date(datetime) - as_date(reference_datetime))) |>
   
   # what is the average skill over horizon
@@ -563,7 +568,7 @@ If you were to start a model comparison project or a large synthesis evaluating 
 
 -   are we making equal comparisons?
 
-For the aquatics example we are comparing `r nrow(distinct(filter(aquatic_forecasts, model_id == 'climatology'), reference_datetime))` climatology forecasts to `r nrow(distinct(filter(aquatic_forecasts, model_id == 'flareGLM'), reference_datetime))` flareGLM forecasts - is this okay? What about if our phenology model only forecasted greenness during the winter (easy) and not in spring (harder), would this be a fair comparison?
+For the phenology example we are comparing `r nrow(distinct(filter(multi_model_forecasts, model_id == 'PEG'), reference_datetime))` PEG forecasts to ` nrow(distinct(filter(multi_model_forecasts, model_id == 'UCSC_P_EDM'), reference_datetime))` UCSC_P_EDM forecasts - is this okay? What about if one of the models only forecasted greenness during the winter (easy) and not in spring (harder), would this be a fair comparison?
 
 -   what type of model was used and how are sources of uncertainty represented in the forecast?
 
