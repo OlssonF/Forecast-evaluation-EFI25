@@ -533,8 +533,8 @@ aquatic_forecasts |>
   ggplot(aes(x = horizon)) +
   geom_line(aes(y = skill)) +
   geom_hline(yintercept = 0) +
-  annotate('text', x = 5, y = 0.1, label = 'null better') +
-  annotate('text', x = 5, y = -0.1, label = 'model better') 
+  annotate('text', x = 5, y = -0.1, label = 'null better') +
+  annotate('text', x = 5, y = 0.1, label = 'model better') 
 ```
 
 We see that at the shortest horizons, the model of interest (`flareGLM`) does better than the null but beyond a couple of weeks lead time the null climatology model does better.
@@ -557,7 +557,6 @@ table <- tibble(Metric = c("RMSE", "Bias", "MAE", "R<sup>2</sup>", "SD", "CRPS",
                                 "For binary/categorical outcomes"))
 
 
-# need to make sure to cite Mike's book, Ch. 16 in particular
 kable(table, escape = FALSE)
 
 ```
