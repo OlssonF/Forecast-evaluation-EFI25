@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15587490.svg)](https://doi.org/10.5281/zenodo.15587490)
+
 # Forecast-evaluation-EFI25
 
 This repository contains the materials produced for and presented at the Ecological Forecasting Initiative Conference 2025. The materials contain a workshop tutorial that introduces concepts of ecological forecast evaluation and synthesis.
